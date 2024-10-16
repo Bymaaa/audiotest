@@ -1,0 +1,206 @@
+<html>
+<head>
+  <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+  <style>
+    body {
+      background-color: #2b0000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .music-player {
+      background-color: #2b0000;
+      border-radius: 20px;
+      padding: 20px;
+      width: 300px;
+      color: white;
+      text-align: center;
+    }
+    .music-player img {
+      width: 100%;
+      border-radius: 10px;
+    }
+    .music-player .song-title {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .music-player .artist {
+      font-size: 1rem;
+      color: #b3b3b3;
+    }
+    .music-player .progress {
+      height: 5px;
+      background-color: #b3b3b3;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .music-player .progress-bar {
+      background-color: white;
+      height: 100%;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    .music-player .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .music-player .controls i {
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+    .music-player .controls i:active {
+      transform: scale(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="music-player">
+    <img alt="Song Cover" src="https://placehold.co/300x300"/>
+    <div class="song-title" id="song-title">Song Title</div>
+    <div class="artist" id="artist">Artist</div>
+    <div class="progress mt-3">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="controls mt-3">
+      <span id="current-time">00:00</span>
+      <i class="fas fa-backward" id="prev-btn"></i>
+      <i class="fas fa-play-circle" id="play-pause-btn"></i>
+      <i class="fas fa-forward" id="next-btn"></i>
+      <span id="duration">00:00</span>
+    </div>
+  </div>
+
+  <script>
+    const clientId = 'b6bd4a64f786416cb26fd0f6a4237d97';
+    const clientSecret = '5c1d9456ff7c44bc98dbcb03b755716c';
+    const redirectUri = 'https://bymaaa.github.io/audiotest/';
+    let accessToken = '';
+    let currentTrackIndex = 0;
+    let trackUris = [];
+
+    // Redirect user to Spotify authorization page
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=user-read-private%20user-read-email%20user-modify-playback-state%20user-read-playback-state`;
+    window.location.href = authUrl;
+
+    // Handle callback from Spotify authorization page
+    window.addEventListener('load', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+
+      if (code) {
+        // Exchange authorization code for access token
+        fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `grant_type=authorization_code&code=${code}&redirect_uri=${redirectUri}&client_id=${clientId}&client_secret=${clientSecret}`
+        })
+        .then(response => response.json())
+        .then(data => {
+          accessToken = data.access_token;
+          console.log(`Access token: ${accessToken}`);
+
+          // Initialize Spotify Web API with access token
+          const spotifyApi = new SpotifyWebApi({
+            accessToken
+          });
+
+          // Get playlist tracks
+          spotifyApi.getPlaylistTracks('6SVqQYhjilbDDpvijrdT7U')
+            .then(data => {
+              const tracks = data.items;
+              trackUris = tracks.map(track => track.track.uri);
+
+              // Play first track
+              playTrack(trackUris[currentTrackIndex]);
+
+              // Add event listeners to buttons
+              const playPauseBtn = document.getElementById('play-pause-btn');
+              const prevBtn = document.getElementById('prev-btn');
+              const nextBtn = document.getElementById('next-btn');
+              const currentTimeDisplay = document.getElementById('current-time');
+              const durationDisplay = document.getElementById('duration');
+              const progressBar = document.getElementById('progress-bar');
+
+              playPauseBtn.addEventListener('click', function() {
+                if (audio.paused) {
+                  audio.play();
+                  playPauseBtn.classList.remove('fa-play-circle');
+                  playPauseBtn.classList.add('fa-pause-circle');
+                } else {
+                  audio.pause();
+                  playPauseBtn.classList.remove('fa-pause-circle');
+                  playPauseBtn.classList.add('fa-play-circle');
+                }
+              });
+
+              prevBtn.addEventListener('click', function() {
+                currentTrackIndex--;
+                if (currentTrackIndex < 0) {
+                  currentTrackIndex = trackUris.length - 1;
+                }
+                playTrack(trackUris[currentTrackIndex]);
+              });
+
+              nextBtn.addEventListener('click', function() {
+                currentTrackIndex++;
+                if (currentTrackIndex >= trackUris.length) {
+                  currentTrackIndex = 0;
+                }
+                playTrack(trackUris[currentTrackIndex]);
+              });
+
+              audio.addEventListener('timeupdate', function() {
+                const currentTime = audio.currentTime;
+                const duration = audio.duration;
+                const minutes = Math.floor(currentTime / 60);
+                const seconds = Math.floor(currentTime % 60);
+                currentTimeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                const minutesDuration = Math.floor(duration / 60);
+                const secondsDuration = Math.floor(duration % 60);
+                durationDisplay.textContent = `${minutesDuration.toString().padStart(2, '0')}:${secondsDuration.toString().padStart(2, '0')}`;
+                updateProgressBar();
+              });
+
+              audio.addEventListener('ended', function() {
+                nextBtn.click();
+              });
+            })
+            .catch(err => console.error(err));
+        })
+        .catch(error => console.error(error));
+      }
+    });
+
+    function playTrack(uri) {
+      fetch(`https://api.spotify.com/v1/me/player/play`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          'uris': [uri]
+        })
+      })
+      .then(response => response.json())
+      .then(data => console.log('Lagu sedang diputar'))
+      .catch(err => console.error(err));
+    }
+
+    function updateProgressBar() {
+      const progress = (audio.currentTime / audio.duration) * 100;
+      progressBar.style.width = `${progress}%`;
+    }
+  </script>
+
+  <audio id="audio"></audio>
+</body>
+</html>
