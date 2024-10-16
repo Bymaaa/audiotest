@@ -84,9 +84,11 @@
     let currentTrackIndex = 0;
     let trackUris = [];
 
-    // Redirect user to Spotify authorization page
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=user-read-private%20user-read-email%20user-modify-playback-state%20user-read-playback-state`;
-    window.location.href = authUrl;
+    // Redirect user to Spotify authorization page if there's no access token
+    if (!localStorage.getItem('access_token')) {
+      const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=user-read-private%20user-read-email%20user-modify-playback-state%20user-read-playback-state`;
+      window.location.href = authUrl;
+    }
 
     // Handle callback from Spotify authorization page
     window.addEventListener('load', () => {
@@ -105,7 +107,11 @@
         .then(response => response.json())
         .then(data => {
           accessToken = data.access_token;
+          localStorage.setItem('access_token', accessToken);
           console.log(`Access token: ${accessToken}`);
+
+          // Remove code parameter from URL
+          window.history.replaceState({}, document.title, window.location.pathname);
 
           // Initialize Spotify Web API with access token
           const spotifyApi = new SpotifyWebApi({
